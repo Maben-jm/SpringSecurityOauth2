@@ -2,7 +2,7 @@
 
 # SpringSecurity和oauth2学习
 
-## 1.基于session的认证方式
+## 1.基于session的认证方式(security-001-session)
 
 ### 1.1 认证流程
 
@@ -612,4 +612,380 @@ public class SimpleAuthenticationInterceptor implements HandlerInterceptor {
 ````
 Maven启动命令:   clean tomcat7:run
 ````
+
+## 2. SpringSecurity (security-002-spring)
+
+### 2.1 SpringSecurity简介
+
+````
+SpringSecurity是一个能为基于Spring框架提供声明式的安全访问控制解决方案的安全框架;
+````
+
+### 2.2 项目pom.xml
+
+````xml
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.maben</groupId>
+    <artifactId>security-002-spring</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>war</packaging>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+    </properties>
+
+    <dependencies>
+        <!--spring web依赖-->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-web</artifactId>
+            <version>5.1.4.RELEASE</version>
+        </dependency>
+
+        <!--spring security依赖-->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-config</artifactId>
+            <version>5.1.4.RELEASE</version>
+        </dependency>
+
+        <!--spring mvc 依赖-->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-webmvc</artifactId>
+            <version>5.1.5.RELEASE</version>
+        </dependency>
+
+        <!--servlet依赖-->
+        <dependency>
+            <groupId>javax.servlet</groupId>
+            <artifactId>javax.servlet-api</artifactId>
+            <version>3.0.1</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!--lombok 依赖-->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>1.18.8</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+    <build>
+        <finalName>security-002-spring</finalName>
+        <pluginManagement>
+            <plugins>
+                <!--tomcat7 插件-->
+                <plugin>
+                    <groupId>org.apache.tomcat.maven</groupId>
+                    <artifactId>tomcat7-maven-plugin</artifactId>
+                    <version>2.2</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <configuration>
+                        <source>1.8</source>
+                        <target>1.8</target>
+                    </configuration>
+                </plugin>
+
+                <plugin>
+                    <artifactId>maven-resources-plugin</artifactId>
+                    <configuration>
+                        <encoding>utf-8</encoding>
+                        <useDefaultDelimiters>true</useDefaultDelimiters>
+                        <resources>
+                            <resource>
+                                <directory>src/main/resources</directory>
+                                <filtering>true</filtering>
+                                <includes>
+                                    <include>**/*</include>
+                                </includes>
+                            </resource>
+                            <resource>
+                                <directory>src/main/java</directory>
+                                <includes>
+                                    <include>**/*.xml</include>
+                                </includes>
+                            </resource>
+                        </resources>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+</project>
+````
+
+### 2.3 applicationContext.xml配置类(Java)
+
+````java
+package com.maben.security.config;
+
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.FilterType;
+import org.springframework.stereotype.Controller;
+/**
+ * 在此配置除了Controller的其它bean，比如：数据库链接池、事务管理器、业务bean等。
+ * 相当于applicationContext.xml
+ */
+@Configuration
+@ComponentScan(basePackages = "com.maben.security"
+,excludeFilters = {@ComponentScan.Filter(type = FilterType.ANNOTATION,value =
+Controller.class)})
+public class ApplicationConfig {
+}
+````
+
+### 2.4 springmvc.xml配置类(Java)
+
+````java
+package com.maben.security.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.FilterType;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.servlet.config.annotation.EnableWebMvc;
+import org.springframework.web.servlet.config.annotation.ViewControllerRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import org.springframework.web.servlet.view.InternalResourceViewResolver;
+
+/**
+ * springmvc配置类
+ * 就相当于springmvc.xml文件
+ */
+@Configuration
+@EnableWebMvc
+@ComponentScan(basePackages = "com.maben.security"
+        , includeFilters = {@ComponentScan.Filter(type = FilterType.ANNOTATION, value = Controller.class)})
+public class WebConfig implements WebMvcConfigurer {
+    //视频解析器
+    @Bean
+    public InternalResourceViewResolver viewResolver() {
+        InternalResourceViewResolver viewResolver = new InternalResourceViewResolver();
+        viewResolver.setPrefix("/WEB‐INF/views/");
+        viewResolver.setSuffix(".jsp");
+        return viewResolver;
+    }
+
+    /**
+     * 默认Url根路径跳转到/login，此url为spring security提供
+     *
+     * @param registry registry
+     */
+    @Override
+    public void addViewControllers(ViewControllerRegistry registry) {
+        registry.addViewController("/").setViewName("redirect:/login");
+    }
+}
+````
+
+
+
+### 2.5 SpringSecurity 配置类
+
+````java
+package com.maben.security.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.crypto.password.NoOpPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+
+/**
+ * SpringSecurity 安全配置类
+ */
+@EnableWebSecurity
+public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
+    /**
+     * 配置用户信息服务
+     *
+     * @return UserDetailsService
+     */
+    @Bean
+    public UserDetailsService userDetailsService() {
+        InMemoryUserDetailsManager manager = new InMemoryUserDetailsManager();
+        manager.createUser(User.withUsername("zhangsan").password("123").authorities("p1").build());
+        manager.createUser(User.withUsername("lisi").password("456").authorities("p2").build());
+        return manager;
+    }
+
+    /**
+     * 密码编码器
+     *
+     * @return PasswordEncoder
+     */
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        //密码不需要任何操作,直接比对
+        return NoOpPasswordEncoder.getInstance();
+    }
+
+    /**
+     * 配置安全拦截机制
+     *
+     * @param http http
+     * @throws Exception ..
+     */
+    @Override
+    protected void configure(HttpSecurity http) throws Exception {
+        http
+                .authorizeRequests()
+                .antMatchers("/r/r1").hasAuthority("p1") //访问[/r/r1]资源需要权限[p1]
+                .antMatchers("/r/r2").hasAuthority("p2")//访问[/r/r2]资源需要权限[p2]
+                .antMatchers("/r/**").authenticated() //所有/r/**的请求必须认证通过
+                .anyRequest().permitAll() //除了/r/**，其它的请求可以访问
+                .and()
+                .formLogin()//允许表单登录
+                .successForwardUrl("/login‐success"); //自定义登录成功的页面地址
+    }
+
+}
+````
+
+### 2.6 web.xml配置类
+
+````java
+package com.maben.security.init;
+
+import com.maben.security.config.ApplicationConfig;
+import com.maben.security.config.WebConfig;
+import com.maben.security.config.WebSecurityConfig;
+import org.springframework.web.servlet.support.AbstractAnnotationConfigDispatcherServletInitializer;
+
+/**
+ * 加载相关配置类,相当于web.xml
+ */
+public class SpringApplicationInitializer extends
+        AbstractAnnotationConfigDispatcherServletInitializer {
+    /**
+     * 加载spring配置类
+     *      <listener>
+     *          <listener‐class>org.springframework.web.context.ContextLoaderListener</listener‐class>
+     *     </listener>
+     *     <context‐param>
+     *     <param‐name>contextConfigLocation</param‐name>
+     *     <param‐value>/WEB‐INF/application‐context.xml</param‐value>
+     *     </context‐param>
+     * @return ..
+     */
+    @Override
+    protected Class<?>[] getRootConfigClasses() {
+        //指定rootContext的配置类
+        return new Class<?>[] { ApplicationConfig.class, WebSecurityConfig.class};
+    }
+
+    /**
+     * 加载springMVC配置类
+     <servlet>
+     <servlet‐name>springmvc</servlet‐name>
+     <servlet‐class>org.springframework.web.servlet.DispatcherServlet</servlet‐class>
+     <init‐param>
+     <param‐name>contextConfigLocation</param‐name>
+     <param‐value>/WEB‐INF/spring‐mvc.xml</param‐value>
+     </init‐param>
+     <load‐on‐startup>1</load‐on‐startup>
+     </servlet>
+     * @return ..
+     */
+    @Override
+    protected Class<?>[] getServletConfigClasses() {
+        return new Class<?>[] { WebConfig.class }; //指定servletContext的配置类
+    }
+
+    /**
+     <servlet‐mapping>
+     <servlet‐name>springmvc</servlet‐name>
+     <url‐pattern>/</url‐pattern>
+     </servlet‐mapping>
+     * @return
+     */
+    @Override
+    protected String[] getServletMappings() {
+        return new String [] {"/"};
+    }
+}
+````
+
+### 2.7 SpringSecurity初始化类
+
+````java
+package com.maben.security.init;
+
+import org.springframework.security.web.context.AbstractSecurityWebApplicationInitializer;
+
+/**
+ * spring security 初始化类
+ */
+public class SpringSecurityApplicationInitializer extends AbstractSecurityWebApplicationInitializer {
+    public SpringSecurityApplicationInitializer() {
+    }
+}
+````
+
+###  2.8 Controller测试类
+
+````java
+package com.maben.security.controller;
+
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * 登录controller
+ */
+@RestController
+public class LoginController {
+    /**
+     * 认证成功接口
+     *
+     * @return ..
+     */
+    @RequestMapping(value = "/login‐success", produces = "text/plain;charset=utf-8")
+    public String loginSuccess() {
+        return " 登录成功";
+    }
+
+    /**
+     * 测试资源1
+     *
+     * @return ..
+     */
+    @GetMapping(value = "/r/r1", produces = "text/plain;charset=utf-8")
+    public String r1() {
+        return " 访问资源1";
+    }
+
+    /**
+     * 测试资源2
+     *
+     * @return ..
+     */
+    @GetMapping(value = "/r/r2", produces = "text/plain;charset=utf-8")
+    public String r2() {
+        return " 访问资源2";
+    }
+}
+
+````
+
+
 
