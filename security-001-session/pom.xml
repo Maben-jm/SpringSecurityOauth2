@@ -33,7 +33,7 @@
         </dependency>
     </dependencies>
     <build>
-        <finalName>security-springmvc</finalName>
+        <finalName>security-001-session</finalName>
         <pluginManagement>
             <plugins>
                 <!--Tomcat插件-->
