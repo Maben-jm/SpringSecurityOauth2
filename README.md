@@ -2,7 +2,9 @@
 
 # SpringSecurity和oauth2学习
 
-## 1.基于session的认证方式(security-001-session)
+## 1.基于session的认证方式
+
+>  项目: security-001-session
 
 ### 1.1 认证流程
 
@@ -613,7 +615,9 @@ public class SimpleAuthenticationInterceptor implements HandlerInterceptor {
 Maven启动命令:   clean tomcat7:run
 ````
 
-## 2. SpringSecurity (security-002-spring)
+## 2. SpringSecurity 
+
+> 项目: security-002-spring
 
 ### 2.1 SpringSecurity简介
 
@@ -985,6 +989,360 @@ public class LoginController {
     }
 }
 
+````
+
+## 3. SpringbootSecurity学习
+
+> 项目: security-003-springboot
+
+### 3.1  pom.xml文件
+
+````xml
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.maben</groupId>
+    <artifactId>security-003-springboot</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>2.1.3.RELEASE</version>
+    </parent>
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+    </properties>
+    <dependencies>
+        <!--springboot web依赖-->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <!--springboot security依赖-->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+        <!--jsp依赖-->
+        <dependency>
+            <groupId>javax.servlet</groupId>
+            <artifactId>javax.servlet-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <!--jsp中jstl标签依赖-->
+        <dependency>
+            <groupId>javax.servlet</groupId>
+            <artifactId>jstl</artifactId>
+        </dependency>
+        <!--jsp依赖-->
+        <dependency>
+            <groupId>org.apache.tomcat.embed</groupId>
+            <artifactId>tomcat-embed-jasper</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <!--Tomcat依赖-->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-tomcat</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <!--lombok依赖-->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+        </dependency>
+        <!--测试依赖-->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+    <build>
+        <finalName>security-002-spring</finalName>
+        <pluginManagement>
+            <plugins>
+                <!--tomcat7 插件-->
+                <plugin>
+                    <groupId>org.apache.tomcat.maven</groupId>
+                    <artifactId>tomcat7-maven-plugin</artifactId>
+                    <version>2.2</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <configuration>
+                        <source>1.8</source>
+                        <target>1.8</target>
+                    </configuration>
+                </plugin>
+
+                <plugin>
+                    <artifactId>maven-resources-plugin</artifactId>
+                    <configuration>
+                        <encoding>utf-8</encoding>
+                        <useDefaultDelimiters>true</useDefaultDelimiters>
+                        <resources>
+                            <resource>
+                                <directory>src/main/resources</directory>
+                                <filtering>true</filtering>
+                                <includes>
+                                    <include>**/*</include>
+                                </includes>
+                            </resource>
+                            <resource>
+                                <directory>src/main/java</directory>
+                                <includes>
+                                    <include>**/*.xml</include>
+                                </includes>
+                            </resource>
+                        </resources>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+</project>
+````
+
+### 3.2  application.yml配置
+
+````yaml
+server:
+  port: 8080
+  servlet:
+    context-path: /
+spring:
+  application:
+    name: security-003-springcloud
+  mvc:
+    view:
+      prefix: /WEB-INF/views
+      suffix: .jsp
+````
+
+### 3.3 主启动类
+
+````java
+package com.maben.securitySpringboot;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+/**
+ * springboot启动类
+ */
+@SpringBootApplication
+public class Security003Springboot {
+
+    /**
+     * 项目主启动方法
+     * @param args 启动参数
+     */
+    public static void main(String[] args) {
+        SpringApplication.run(Security003Springboot.class, args);
+        System.out.println("*****************启动完成******************");
+    }
+
+}
+````
+
+### 3.4 springmvc.xml(Java配置类)
+
+````java
+package com.maben.securitySpringboot.config;
+
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.ViewControllerRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+/**
+ * springmvc配置类
+ * 就相当于springmvc.xml文件
+ * 由于Spring boot starter自动装配机制，这里无需使用@EnableWebMvc与@ComponentScan
+ */
+@Configuration
+public class WebConfig implements WebMvcConfigurer {
+    /**
+     * 将默认项目根路径跳转到/login,此URL为spring security提供
+     * @param registry registry
+     */
+    @Override
+    public void addViewControllers(ViewControllerRegistry registry) {
+        registry.addViewController("/").setViewName("redirect:/login");
+    }
+}
+````
+
+### 3.5 Security配置文件
+
+````java
+package com.maben.securitySpringboot.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.NoOpPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+
+/**
+ * SpringSecurity 安全配置类
+ */
+@EnableWebSecurity
+public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
+    /**
+     * 配置用户信息服务
+     * @return UserDetailsService
+     */
+    @Bean
+    public UserDetailsService userDetailsService() {
+        InMemoryUserDetailsManager manager = new InMemoryUserDetailsManager();
+        manager.createUser(User.withUsername("zhangsan").password("123").authorities("p1").build());
+        manager.createUser(User.withUsername("lisi").password("456").authorities("p2").build());
+        return manager;
+    }
+
+    /**
+     * 密码编码器
+     *
+     * @return PasswordEncoder
+     */
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        //密码不需要任何操作,直接比对
+//        return NoOpPasswordEncoder.getInstance();
+
+        //使用BCrypt编码验证密码
+        return new BCryptPasswordEncoder();
+    }
+
+    /**
+     * 配置安全拦截机制
+     *
+     * @param http http
+     * @throws Exception ..
+     */
+    @Override
+    protected void configure(HttpSecurity http) throws Exception {
+        http
+                .authorizeRequests()
+                .antMatchers("/r/r1").hasAuthority("p1") //访问[/r/r1]资源需要权限[p1]
+                .antMatchers("/r/r2").hasAuthority("p2")//访问[/r/r2]资源需要权限[p2]
+                .antMatchers("/r/**").authenticated() //所有/r/**的请求必须认证通过
+                .anyRequest().permitAll() //除了/r/**，其它的请求可以访问
+                .and()
+                .formLogin()//允许表单登录
+                .successForwardUrl("/login‐success"); //自定义登录成功的页面地址
+    }
+
+}
+````
+
+### 3.6 Controller类
+
+````java
+package com.maben.securitySpringboot.controller;
+
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * 登录controller
+ */
+@RestController
+public class LoginController {
+    /**
+     * 认证成功接口
+     *
+     * @return ..
+     */
+    @RequestMapping(value = "/login‐success", produces = "text/plain;charset=utf-8")
+    public String loginSuccess() {
+        return " 登录成功";
+    }
+
+    /**
+     * 测试资源1
+     *
+     * @return ..
+     */
+    @GetMapping(value = "/r/r1", produces = "text/plain;charset=utf-8")
+    public String r1() {
+        return " 访问资源1";
+    }
+
+    /**
+     * 测试资源2
+     *
+     * @return ..
+     */
+    @GetMapping(value = "/r/r2", produces = "text/plain;charset=utf-8")
+    public String r2() {
+        return " 访问资源2";
+    }
+}
+````
+
+### 3.7 userDetailsService不用内存的
+
+#### 3.7.1 自定义userDetailService类
+
+````java
+package com.maben.securitySpringboot.service;
+
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.bcrypt.BCrypt;
+import org.springframework.stereotype.Service;
+
+/**
+ * 使用自定义的UserDetailsService,注释掉缓存的
+ */
+@Service
+public class SpringDataUserDetailsService implements UserDetailsService {
+    @Override
+    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+        //登录账号
+        System.out.println("username="+username);
+        //获取编码后的密码
+        String hashpw = BCrypt.hashpw("123",BCrypt.gensalt());
+        //根据账号去数据库查询...
+        //这里暂时使用静态数据
+        UserDetails userDetails = User.withUsername(username).password(hashpw).authorities("p1").build();
+        return userDetails;
+    }
+}
+````
+
+#### 3.7.2 注释掉{WebSecurityConfig.java}类中的内存配置
+
+````java
+/**
+     * 配置用户信息服务
+     * 因为添加了自定义的SpringDataUserDetailsService类,这里讲缓存读取的去掉
+     * @return UserDetailsService
+     */
+//    @Bean
+//    public UserDetailsService userDetailsService() {
+//        InMemoryUserDetailsManager manager = new InMemoryUserDetailsManager();
+//        manager.createUser(User.withUsername("zhangsan").password("123").authorities("p1").build());
+//        manager.createUser(User.withUsername("lisi").password("456").authorities("p2").build());
+//        return manager;
+//    }
 ````
 
 
