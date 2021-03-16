@@ -1793,3 +1793,136 @@ server.servlet.session.timeout=30s
     }
 ````
 
+### 3.13 授权
+
+#### 3.13.1 SQL
+
+````sql
+-- 角色表：
+CREATE TABLE `t_role` (
+`id` varchar(32) NOT NULL,
+`role_name` varchar(255) DEFAULT NULL,
+`description` varchar(255) DEFAULT NULL,
+`create_time` datetime DEFAULT NULL,
+`update_time` datetime DEFAULT NULL,
+`status` char(1) NOT NULL,
+PRIMARY KEY (`id`),
+UNIQUE KEY `unique_role_name` (`role_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+insert into `t_role`(`id`,`role_name`,`description`,`create_time`,`update_time`,`status`) values('1','管理员',NULL,NULL,NULL,'');
+
+-- 用户角色关系表：
+CREATE TABLE `t_user_role` (
+`user_id` varchar(32) NOT NULL,
+`role_id` varchar(32) NOT NULL,
+`create_time` datetime DEFAULT NULL,
+`creator` varchar(255) DEFAULT NULL,
+PRIMARY KEY (`user_id`,`role_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+insert into `t_user_role`(`user_id`,`role_id`,`create_time`,`creator`) values('1','1',NULL,NULL);
+
+-- 权限表：
+CREATE TABLE `t_permission` (
+`id` varchar(32) NOT NULL,
+`code` varchar(32) NOT NULL COMMENT '权限标识符',
+`description` varchar(64) DEFAULT NULL COMMENT '描述',
+`url` varchar(128) DEFAULT NULL COMMENT '请求地址',
+PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+insert into `t_permission`(`id`,`code`,`description`,`url`) values 
+('1','p1','测试资源1','/r/r1'),('2','p3','测试资源2','/r/r2');
+
+-- 角色权限关系表：
+CREATE TABLE `t_role_permission` (
+`role_id` varchar(32) NOT NULL,
+`permission_id` varchar(32) NOT NULL,
+PRIMARY KEY (`role_id`,`permission_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+insert into `t_role_permission`(`role_id`,`permission_id`) values 
+('1','1'),('1','2');
+````
+
+#### 3.13.2 dao接口修改
+
+````java
+//根据用户id查询用户权限
+public List<String> findPermissionsByUserId(String userId){
+        String sql="SELECT * FROM t_permission WHERE id IN(\n" +
+                "SELECT permission_id FROM t_role_permission WHERE role_id IN(\n" +
+                "\tSELECT role_id FROM t_user_role WHERE user_id = ? \n" +
+                ")\n" +
+                ")";
+        List<PermissionDto> list = jdbcTemplate.query(sql, new Object[]{userId}, new BeanPropertyRowMapper<>(PermissionDto.class));
+        List<String> permissions = new ArrayList<>();
+        list.iterator().forEachRemaining(c ->permissions.add(c.getCode()));
+        return permissions;
+    }
+````
+
+#### 3.13.3 po类添加
+
+````java
+@Data
+public class PermissionDto {
+
+    private String id;
+    private String code;
+    private String description;
+    private String url;
+}
+````
+
+#### 3.13.4 service类修改
+
+````java
+@Override
+public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+    //登录账号
+    System.out.println("username="+username);
+    //根据账号去数据库查询...
+    UserDto user = userDao.getUserByUsername(username);
+    if(user == null){
+        return null;
+    }
+    //查询用户权限
+    List<String> permissions = userDao.findPermissionsByUserId(user.getId());
+    String[] perarray = new String[permissions.size()];
+    permissions.toArray(perarray);
+    //创建userDetails
+    UserDetails userDetails = User.withUsername(user.getFullname()).password(user.getPassword()).authorities(perarray).build();
+    return userDetails;
+}
+````
+
+#### 3.13.5 授权
+
+> 第一种方法就是"Web授权"在Webconfig.java中配置,类似:
+>
+> ​	.antMatchers("/r/r1").hasAuthority("p1") 
+>
+> ​	.antMatchers("/r/r2").hasAuthority("p2") 
+>
+> 第二种方法就是"方法授权",也就是方法注解,方便快捷(推荐使用)
+>
+> ​	我们可以在任何 @Configuration 实例上使用 @EnableGlobalMethodSecurity 注释来启用基于注解的安全性。
+
+````java
+@Configuration
+@EnableGlobalMethodSecurity(securedEnabled = true,prePostEnabled = true)
+public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
+    ...
+}
+
+@GetMapping(value = "/r/r1",produces = {"text/plain;charset=UTF-8"})
+@PreAuthorize("hasAuthority('p1')")//拥有p1权限才可以访问
+public String r1(){
+    return getUsername()+" 访问资源1";
+}
+
+@GetMapping(value = "/r/r2",produces = {"text/plain;charset=UTF-8"})
+@PreAuthorize("hasAuthority('p2') or hasAuthority('p3')")//拥有p2权限才可以访问
+public String r2(){
+    return getUsername()+" 访问资源2";
+}
+````
+

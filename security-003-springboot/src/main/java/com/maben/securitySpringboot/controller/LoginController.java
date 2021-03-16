@@ -1,5 +1,6 @@
 package com.maben.securitySpringboot.controller;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -47,10 +48,10 @@ public class LoginController {
      *
      * @return ..
      */
-    @GetMapping(value = "/r/r1", produces = "text/plain;charset=utf-8")
-    public String r1() {
-        String username = getUsername();
-        return username + " 访问资源1";
+    @GetMapping(value = "/r/r1",produces = {"text/plain;charset=UTF-8"})
+    @PreAuthorize("hasAuthority('p1')")//拥有p1权限才可以访问
+    public String r1(){
+        return getUsername()+" 访问资源1";
     }
 
     /**
@@ -58,9 +59,9 @@ public class LoginController {
      *
      * @return ..
      */
-    @GetMapping(value = "/r/r2", produces = "text/plain;charset=utf-8")
-    public String r2() {
-        String username = getUsername();
-        return username + " 访问资源2";
+    @GetMapping(value = "/r/r2",produces = {"text/plain;charset=UTF-8"})
+    @PreAuthorize("hasAuthority('p2') or hasAuthority('p3')")//拥有p2权限或者p3权限才可以访问
+    public String r2(){
+        return getUsername()+" 访问资源2";
     }
 }

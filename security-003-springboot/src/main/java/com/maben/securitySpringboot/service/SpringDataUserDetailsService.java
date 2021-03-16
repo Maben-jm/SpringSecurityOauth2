@@ -10,6 +10,8 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCrypt;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 /**
  * 使用自定义的UserDetailsService,注释掉缓存的
  */
@@ -21,14 +23,18 @@ public class SpringDataUserDetailsService implements UserDetailsService {
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         //登录账号
-        System.out.println("username=" + username);
+        System.out.println("username="+username);
         //根据账号去数据库查询...
-        final UserDto user = userDao.getUserByUsername(username);
-        if (user == null) {
+        UserDto user = userDao.getUserByUsername(username);
+        if(user == null){
             return null;
         }
-        //这里暂时使用静态数据
-        UserDetails userDetails = User.withUsername(user.getFullname()).password(user.getPassword()).authorities("p1").build();
+        //查询用户权限
+        List<String> permissions = userDao.findPermissionsByUserId(user.getId());
+        String[] perarray = new String[permissions.size()];
+        permissions.toArray(perarray);
+        //创建userDetails
+        UserDetails userDetails = User.withUsername(user.getFullname()).password(user.getPassword()).authorities(perarray).build();
         return userDetails;
     }
 }
