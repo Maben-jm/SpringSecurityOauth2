@@ -14,7 +14,7 @@ public class LoginController {
      *
      * @return ..
      */
-    @RequestMapping(value = "/login‐success", produces = "text/plain;charset=utf-8")
+    @RequestMapping(value = "/login-success", produces = "text/plain;charset=utf-8")
     public String loginSuccess() {
         return " 登录成功";
     }

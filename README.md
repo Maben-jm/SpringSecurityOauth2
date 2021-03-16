@@ -1221,10 +1221,10 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
     @Bean
     public PasswordEncoder passwordEncoder() {
         //密码不需要任何操作,直接比对
-//        return NoOpPasswordEncoder.getInstance();
+       return NoOpPasswordEncoder.getInstance();
 
         //使用BCrypt编码验证密码
-        return new BCryptPasswordEncoder();
+//        return new BCryptPasswordEncoder();
     }
 
     /**
@@ -1310,7 +1310,7 @@ import org.springframework.security.crypto.bcrypt.BCrypt;
 import org.springframework.stereotype.Service;
 
 /**
- * 使用自定义的UserDetailsService,注释掉缓存的
+ * 使用自定义的UserDetailsService
  */
 @Service
 public class SpringDataUserDetailsService implements UserDetailsService {
@@ -1328,22 +1328,189 @@ public class SpringDataUserDetailsService implements UserDetailsService {
 }
 ````
 
-#### 3.7.2 注释掉{WebSecurityConfig.java}类中的内存配置
+#### 3.7.2 WebSecurityConfig.java修改
+
+> 1.注释掉缓存用户信息
+>
+> 2.将编码方式换成BCrypt
+>
+> 3.将访问权限去掉(因为使用的userDetailService)
 
 ````java
+package com.maben.securitySpringboot.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.NoOpPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+
 /**
+ * SpringSecurity 安全配置类
+ */
+@EnableWebSecurity
+public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
+    /**
      * 配置用户信息服务
-     * 因为添加了自定义的SpringDataUserDetailsService类,这里讲缓存读取的去掉
      * @return UserDetailsService
      */
-//    @Bean
-//    public UserDetailsService userDetailsService() {
-//        InMemoryUserDetailsManager manager = new InMemoryUserDetailsManager();
-//        manager.createUser(User.withUsername("zhangsan").password("123").authorities("p1").build());
-//        manager.createUser(User.withUsername("lisi").password("456").authorities("p2").build());
-//        return manager;
-//    }
+   /* @Bean
+    public UserDetailsService userDetailsService() {
+        InMemoryUserDetailsManager manager = new InMemoryUserDetailsManager();
+        manager.createUser(User.withUsername("zhangsan").password("123").authorities("p1").build());
+        manager.createUser(User.withUsername("lisi").password("456").authorities("p2").build());
+        return manager;
+    }*/
+
+    /**
+     * 密码编码器
+     *
+     * @return PasswordEncoder
+     */
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        //密码不需要任何操作,直接比对
+//       return NoOpPasswordEncoder.getInstance();
+
+        //使用BCrypt编码验证密码
+        return new BCryptPasswordEncoder();
+    }
+
+    /**
+     * 配置安全拦截机制
+     *
+     * @param http http
+     * @throws Exception ..
+     */
+    @Override
+    protected void configure(HttpSecurity http) throws Exception {
+        http
+                .authorizeRequests()
+ //               .antMatchers("/r/r1").hasAuthority("p1") //访问[/r/r1]资源需要权限[p1]
+//                .antMatchers("/r/r2").hasAuthority("p2")//访问[/r/r2]资源需要权限[p2]
+                .antMatchers("/r/**").authenticated() //所有/r/**的请求必须认证通过
+                .anyRequest().permitAll() //除了/r/**，其它的请求可以访问
+                .and()
+                .formLogin()//允许表单登录
+                .successForwardUrl("/login‐success"); //自定义登录成功的页面地址
+    }
+
+}
 ````
+
+### 3.8 BCryptPasswordEncoder测试类
+
+````java
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.crypto.bcrypt.BCrypt;
+import org.springframework.test.context.junit4.SpringRunner;
+
+/**
+ * 测试BCrypt编码
+ */
+@SpringBootTest(classes = TestBCrypt.class)
+@RunWith(SpringRunner.class)
+public class TestBCrypt {
+
+    @Test
+    public void testBCrypt(){
+        //对原始密码加密
+        String hashpw = BCrypt.hashpw("123",BCrypt.gensalt());
+        System.out.println(hashpw);
+        //校验原始密码和BCrypt密码是否一致
+        boolean checkpw = BCrypt.checkpw("123","$2a$10$NlBC84MVb7F95EXYTXwLneXgCca6/GipyWR5NHm8K0203bSQMLpvm");
+        System.out.println(checkpw);
+    }
+}
+````
+
+### 3.9 配置自定义的登录页面
+
+#### 3.9.0 application.yml
+
+````yaml
+server:
+  port: 8080
+  servlet:
+    context-path: /
+spring:
+  application:
+    name: security-003-springcloud
+  mvc:
+    view:
+      prefix: /WEB-INF/view/
+      suffix: .jsp
+````
+
+
+
+#### 3.9.1 WebConfifig.java
+
+````java
+ /**
+     * 将默认项目根路径跳转到自定义的登录页面
+     * @param registry registry
+     */
+    @Override
+    public void addViewControllers(ViewControllerRegistry registry) {
+        registry.addViewController("/").setViewName("redirect:/login-view");
+        registry.addViewController("/login-view").setViewName("login");
+    }
+````
+
+#### 3.9.2 WebSecurityConfifig
+
+````java
+    /**
+     * 配置安全拦截机制
+     *
+     * @param http http
+     * @throws Exception ..
+     */
+    @Override
+    protected void configure(HttpSecurity http) throws Exception {
+//        自定义登录页面
+        http.csrf().disable() //屏蔽CSRF控制，即spring security不再限制CSRF
+                .authorizeRequests()
+                .antMatchers("/r/**").authenticated() //所有/r/**的请求必须认证通过
+                .anyRequest().permitAll() //除了/r/**，其它的请求可以访问
+                .and()
+                .formLogin()//允许表单登录
+                .loginPage("/login-view") //指定我们自己开发的登录页面,spring security以重定向方式跳转到/login-view
+                .loginProcessingUrl("/login")//指定登录处理的URL，也就是用户名、密码表单提交的目的路径
+                .successForwardUrl("/login-success") //自定义登录成功的页面地址
+                .permitAll();
+    }
+
+````
+
+####  3.9.3 登录页面
+
+````jsp
+<%@ page contentType="text/html;charset=UTF-8" pageEncoding="utf-8" %>
+<html>
+    <head>
+        <title>用户登录</title>
+    </head>
+    <body>
+        <form action="login" method="post">
+            用户名：<input type="text" name="username"><br>
+            密&nbsp;&nbsp;&nbsp;码:
+            <input type="password" name="password"><br>
+            <input type="submit" value="登录">
+        </form>
+    </body>
+</html>
+````
+
+
 
 
 

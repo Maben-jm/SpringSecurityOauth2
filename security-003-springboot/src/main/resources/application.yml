@@ -7,5 +7,5 @@ spring:
     name: security-003-springcloud
   mvc:
     view:
-      prefix: /WEB-INF/views
+      prefix: /WEB-INF/view/
       suffix: .jsp
