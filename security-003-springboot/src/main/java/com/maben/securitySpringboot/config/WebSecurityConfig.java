@@ -75,6 +75,8 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
 //        自定义登录页面
         http.csrf().disable() //屏蔽CSRF控制，即spring security不再限制CSRF
                 .authorizeRequests()
+                .antMatchers("/r/r1").hasAuthority("p1") //访问[/r/r1]资源需要权限[p1]
+                .antMatchers("/r/r2").hasAuthority("p2")//访问[/r/r2]资源需要权限[p2]
                 .antMatchers("/r/**").authenticated() //所有/r/**的请求必须认证通过
                 .anyRequest().permitAll() //除了/r/**，其它的请求可以访问
                 .and()

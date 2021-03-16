@@ -1510,7 +1510,146 @@ spring:
 </html>
 ````
 
+### 3.10 加上数据库
+
+#### 3.10.1 SQL语句
+
+````sql
+-- 建库语句
+CREATE DATABASE `user_db` CHARACTER SET 'utf8' COLLATE 'utf8_general_ci';
+-- 建表语句
+CREATE TABLE `t_user` (
+    `id` bigint(20) NOT NULL COMMENT '用户id',
+    `username` varchar(64) NOT NULL,
+    `password` varchar(64) NOT NULL,
+    `fullname` varchar(255) NOT NULL COMMENT '用户姓名',
+    `mobile` varchar(11) DEFAULT NULL COMMENT '手机号',
+    PRIMARY KEY (`id`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 ROW_FORMAT=DYNAMIC;
+-- 插入语句
+ insert into t_user values(1,"zhangsan","$2a$10$NlBC84MVb7F95EXYTXwLneXgCca6/GipyWR5NHm8K0203bSQMLpvm","zhangsan","13780200377");
+````
+
+#### 3.10.2 pom.xml
+
+````xml
+       <!--mysql依赖-->
+        <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-jdbc</artifactId>
+    </dependency>
+        <dependency>
+            <groupId>mysql</groupId>
+            <artifactId>mysql-connector-java</artifactId>
+            <version>5.1.47</version>
+        </dependency>
+````
+
+#### 3.10.3 application.yml
+
+````yaml
+spring:
+  application:
+    name: security-003-springcloud
+  mvc:
+    view:
+      prefix: /WEB-INF/view/
+      suffix: .jsp
+  datasource:
+    driver-class-name: com.mysql.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/user_db
+    username: root
+    password: root
+````
 
 
 
+#### 3.10.4 pojo类
+
+````java
+package com.maben.securitySpringboot.pojo;
+
+import lombok.Data;
+
+@Data
+public class UserDto {
+    private String id;
+    private String username;
+    private String password;
+    private String fullname;
+    private String mobile;
+}
+````
+
+#### 3.10.5 dao类
+
+````java
+package com.maben.securitySpringboot.dao;
+
+import com.maben.securitySpringboot.pojo.UserDto;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.BeanPropertyRowMapper;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+
+@Repository
+public class UserDao {
+    @Autowired
+    JdbcTemplate jdbcTemplate;
+    public UserDto getUserByUsername(String username){
+        String sql ="select id,username,password,fullname from t_user where username = ?";
+        List<UserDto> list = jdbcTemplate.query(sql, new Object[]{username}, new
+                BeanPropertyRowMapper<>(UserDto.class));
+        if(list == null && list.size() <= 0){
+            return null;
+        }
+        return list.get(0);
+    }
+}
+````
+
+#### 3.10.6 service修改
+
+````java
+package com.maben.securitySpringboot.service;
+
+import com.maben.securitySpringboot.dao.UserDao;
+import com.maben.securitySpringboot.pojo.UserDto;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.bcrypt.BCrypt;
+import org.springframework.stereotype.Service;
+
+/**
+ * 使用自定义的UserDetailsService,注释掉缓存的
+ */
+@Service
+public class SpringDataUserDetailsService implements UserDetailsService {
+    @Autowired
+    UserDao userDao;
+
+    @Override
+    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+        //登录账号
+        System.out.println("username=" + username);
+        //根据账号去数据库查询...
+        final UserDto user = userDao.getUserByUsername(username);
+        if (user == null) {
+            return null;
+        }
+        //这里暂时使用静态数据
+        UserDetails userDetails = User.withUsername(user.getFullname()).password(user.getPassword()).authorities("p1").build();
+        return userDetails;
+    }
+}
+````
+
+### 3.11 会话
+
+> 用户认证通过后，为了避免用户的每次操作都进行认证可将用户的信息保存在会话中。spring security提供会话管理，认证通过后将身份信息放入SecurityContextHolder上下文，SecurityContext与当前线程进行绑定，方便获取用户身份。
 
