@@ -4,6 +4,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -70,13 +71,27 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
      * @param http http
      * @throws Exception ..
      */
+//    @Override
+//    protected void configure(HttpSecurity http) throws Exception {
+////        自定义登录页面
+//        http.csrf().disable() //屏蔽CSRF控制，即spring security不再限制CSRF
+//                .authorizeRequests()
+//                .antMatchers("/r/**").authenticated() //所有/r/**的请求必须认证通过
+//                .anyRequest().permitAll() //除了/r/**，其它的请求可以访问
+//                .and()
+//                .formLogin()//允许表单登录
+//                .loginPage("/login-view") //指定我们自己开发的登录页面,spring security以重定向方式跳转到/login-view
+//                .loginProcessingUrl("/login")//指定登录处理的URL，也就是用户名、密码表单提交的目的路径
+//                .successForwardUrl("/login-success") //自定义登录成功的页面地址
+//                .permitAll();
+//    }
+
+
     @Override
     protected void configure(HttpSecurity http) throws Exception {
 //        自定义登录页面
         http.csrf().disable() //屏蔽CSRF控制，即spring security不再限制CSRF
                 .authorizeRequests()
-                .antMatchers("/r/r1").hasAuthority("p1") //访问[/r/r1]资源需要权限[p1]
-                .antMatchers("/r/r2").hasAuthority("p2")//访问[/r/r2]资源需要权限[p2]
                 .antMatchers("/r/**").authenticated() //所有/r/**的请求必须认证通过
                 .anyRequest().permitAll() //除了/r/**，其它的请求可以访问
                 .and()
@@ -84,7 +99,14 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
                 .loginPage("/login-view") //指定我们自己开发的登录页面,spring security以重定向方式跳转到/login-view
                 .loginProcessingUrl("/login")//指定登录处理的URL，也就是用户名、密码表单提交的目的路径
                 .successForwardUrl("/login-success") //自定义登录成功的页面地址
-                .permitAll();
+                .and()
+                .sessionManagement()
+                .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED) //每个登录成功的用户会新建一个Session
+                .invalidSessionUrl("/login-view?error=INVALID_SESSION")
+                .and()
+                .logout()
+                .logoutUrl("/logout")
+                .logoutSuccessUrl("/login-view?logout");
     }
 
 }

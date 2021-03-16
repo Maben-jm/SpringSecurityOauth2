@@ -1653,3 +1653,143 @@ public class SpringDataUserDetailsService implements UserDetailsService {
 
 > 用户认证通过后，为了避免用户的每次操作都进行认证可将用户的信息保存在会话中。spring security提供会话管理，认证通过后将身份信息放入SecurityContextHolder上下文，SecurityContext与当前线程进行绑定，方便获取用户身份。
 
+#### 3.11.1 获取资源同时获取用户信息
+
+````java
+package com.maben.securitySpringboot.controller;
+
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * 登录controller
+ */
+@RestController
+public class LoginController {
+    /**
+     * 认证成功接口
+     *
+     * @return ..
+     */
+    @RequestMapping(value = "/login-success", produces = "text/plain;charset=utf-8")
+    public String loginSuccess() {
+        String username = getUsername();
+        return username + " 登录成功";
+    }
+
+    /**
+     * 从会话中获取用户名
+     *
+     * @return username
+     */
+    private String getUsername() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (!authentication.isAuthenticated()) {
+            return null;
+        }
+        Object principal = authentication.getPrincipal();
+        String username = null;
+        if (principal instanceof org.springframework.security.core.userdetails.UserDetails) {
+            username = ((org.springframework.security.core.userdetails.UserDetails) principal).getUsername();
+        } else {
+            username = principal.toString();
+        }
+        return username;
+    }
+
+    /**
+     * 测试资源1
+     *
+     * @return ..
+     */
+    @GetMapping(value = "/r/r1", produces = "text/plain;charset=utf-8")
+    public String r1() {
+        String username = getUsername();
+        return username + " 访问资源1";
+    }
+
+    /**
+     * 测试资源2
+     *
+     * @return ..
+     */
+    @GetMapping(value = "/r/r2", produces = "text/plain;charset=utf-8")
+    public String r2() {
+        String username = getUsername();
+        return username + " 访问资源2";
+    }
+}
+````
+
+#### 3.11.2 会话控制简介
+
+````java
+/**
+SessionCreationPolicy.IF_REQUIRED:每个登录成功的用户会新建一个Session
+SessionCreationPolicy.NEVER:Spring Security对登录成功的用户不创建Session了但若你的应用程序在某地方	新建了session，那么Spring Security会用它的。
+SessionCreationPolicy.STATELESS:Spring Security对登录成功的用户不会创建Session了，你的应用程序也不	会允许新建session。并且它会暗示不使用cookie，所以每个请求都需要重新进行身份验证。这种无状态架构适用于	 REST API及其无状态认证机制。
+*/
+@Override
+protected void configure(HttpSecurity http) throws Exception {
+    http.sessionManagement()
+    .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
+}
+````
+
+***会话超时***
+
+> 通过设置会话超时时间来保证session
+
+````java
+1.修改application.properties
+server.servlet.session.timeout=30s
+2.在Webconfig.java中添加设置
+   				 @Override
+    protected void configure(HttpSecurity http) throws Exception {
+//        自定义登录页面
+        http.csrf().disable() //屏蔽CSRF控制，即spring security不再限制CSRF
+                .authorizeRequests()
+                .antMatchers("/r/**").authenticated() //所有/r/**的请求必须认证通过
+                .anyRequest().permitAll() //除了/r/**，其它的请求可以访问
+                .and()
+                .formLogin()//允许表单登录
+                .loginPage("/login-view") //指定我们自己开发的登录页面,spring security以重定向方式跳转到/login-view
+                .loginProcessingUrl("/login")//指定登录处理的URL，也就是用户名、密码表单提交的目的路径
+                .successForwardUrl("/login-success") //自定义登录成功的页面地址            
+                .and()
+                .sessionManagement()
+                .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED) //每个登录成功的用户会新建一个Session
+                .invalidSessionUrl("/login‐view?error=INVALID_SESSION");
+    }
+
+````
+
+### 3.12 添加退出
+
+````java
+   @Override
+    protected void configure(HttpSecurity http) throws Exception {
+//        自定义登录页面
+        http.csrf().disable() //屏蔽CSRF控制，即spring security不再限制CSRF
+                .authorizeRequests()
+                .antMatchers("/r/**").authenticated() //所有/r/**的请求必须认证通过
+                .anyRequest().permitAll() //除了/r/**，其它的请求可以访问
+                .and()
+                .formLogin()//允许表单登录
+                .loginPage("/login-view") //指定我们自己开发的登录页面,spring security以重定向方式跳转到/login-view
+                .loginProcessingUrl("/login")//指定登录处理的URL，也就是用户名、密码表单提交的目的路径
+                .successForwardUrl("/login-success") //自定义登录成功的页面地址
+                .and()
+                .sessionManagement()
+                .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED) //每个登录成功的用户会新建一个Session
+                .invalidSessionUrl("/login-view?error=INVALID_SESSION")
+                .and()
+                .logout()
+                .logoutUrl("/logout")
+                .logoutSuccessUrl("/login-view?logout");
+    }
+````
+
