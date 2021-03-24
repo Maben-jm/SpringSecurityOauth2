@@ -16,13 +16,17 @@ import org.springframework.security.oauth2.provider.code.AuthorizationCodeServic
 import org.springframework.security.oauth2.provider.code.InMemoryAuthorizationCodeServices;
 import org.springframework.security.oauth2.provider.token.AuthorizationServerTokenServices;
 import org.springframework.security.oauth2.provider.token.DefaultTokenServices;
+import org.springframework.security.oauth2.provider.token.TokenEnhancerChain;
 import org.springframework.security.oauth2.provider.token.TokenStore;
+import org.springframework.security.oauth2.provider.token.store.JwtAccessTokenConverter;
+
+import java.util.Arrays;
 
 /**
  * 认证配置类
  */
-@Configuration
-@EnableAuthorizationServer
+//@Configuration
+//@EnableAuthorizationServer
 public class AuthorizationServer extends AuthorizationServerConfigurerAdapter {
     /**
      * 一:配置客户端详细信息::
@@ -70,18 +74,34 @@ public class AuthorizationServer extends AuthorizationServerConfigurerAdapter {
      *并且 TokenStore 这个接口有一个默认的实现，它就是 InMemoryTokenStore ，如其命名，所有的令牌是被保存在了内存中。
      * @return
      */
+//    @Bean
+//    public AuthorizationServerTokenServices tokenService() {
+//        DefaultTokenServices service=new DefaultTokenServices();
+//        service.setClientDetailsService(clientDetailsService);
+//        service.setSupportRefreshToken(true);
+//        service.setTokenStore(tokenStore);
+//         令牌默认有效期2小时
+//        service.setAccessTokenValiditySeconds(7200);
+//         刷新令牌默认有效期3天
+//        service.setRefreshTokenValiditySeconds(259200);
+//        return service;
+//    }
+    @Autowired
+    private JwtAccessTokenConverter accessTokenConverter;
     @Bean
     public AuthorizationServerTokenServices tokenService() {
         DefaultTokenServices service=new DefaultTokenServices();
         service.setClientDetailsService(clientDetailsService);
         service.setSupportRefreshToken(true);
         service.setTokenStore(tokenStore);
-        // 令牌默认有效期2小时
-        service.setAccessTokenValiditySeconds(7200);
-        // 刷新令牌默认有效期3天
-        service.setRefreshTokenValiditySeconds(259200);
+        TokenEnhancerChain tokenEnhancerChain = new TokenEnhancerChain();
+        tokenEnhancerChain.setTokenEnhancers(Arrays.asList(accessTokenConverter));
+        service.setTokenEnhancer(tokenEnhancerChain);
+        service.setAccessTokenValiditySeconds(7200); // 令牌默认有效期2小时
+        service.setRefreshTokenValiditySeconds(259200); // 刷新令牌默认有效期3天
         return service;
     }
+
 
     @Autowired
     private AuthorizationCodeServices authorizationCodeServices;

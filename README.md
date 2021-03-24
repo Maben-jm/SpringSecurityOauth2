@@ -2591,17 +2591,24 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
 #### 4.3.2 启动类
 
 ````java
+package com.maben.order;
+
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 
+/**
+ * 启动类
+ */
 @SpringBootApplication
 @EnableDiscoveryClient
 public class Springclooud002Order {
     public static void main(String[] args) {
         SpringApplication.run(Springclooud002Order.class, args);
+        System.out.println("**************启动成功*************");
     }
 }
+
 ````
 
 #### 4.3.3 配置类
@@ -2640,4 +2647,539 @@ feign.compression.request.mime-types[2] = application/json
 feign.compression.request.min-request-size = 2048
 feign.compression.response.enabled = true
 ````
+
+#### 4.3.4 配置类
+
+***资源服务类***
+
+````java
+package com.maben.order.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.config.annotation.web.configuration.EnableResourceServer;
+import org.springframework.security.oauth2.config.annotation.web.configuration.ResourceServerConfigurerAdapter;
+import org.springframework.security.oauth2.config.annotation.web.configurers.ResourceServerSecurityConfigurer;
+import org.springframework.security.oauth2.provider.token.RemoteTokenServices;
+import org.springframework.security.oauth2.provider.token.ResourceServerTokenServices;
+
+/**
+ *  将@EnableResourceServer 注解到一个 @Configuration 配置类上，
+ *  并且必须使用 ResourceServerConfigurer 这个配置对象来进行配置
+ */
+@Configuration
+@EnableResourceServer
+@EnableGlobalMethodSecurity(prePostEnabled = true)
+public class ResouceServerConfig extends ResourceServerConfigurerAdapter {
+    public static final String RESOURCE_ID = "res1";
+
+    /**
+     * ResourceServerSecurityConfigurer中主要包括：
+     *      -tokenServices：ResourceServerTokenServices 类的实例，用来实现令牌服务。
+     *      -tokenStore：TokenStore类的实例，指定令牌如何访问，与tokenServices配置可选
+     *      -resourceId：这个资源服务的ID，这个属性是可选的，但是推荐设置并在授权服务中进行验证。
+     * @param resources resources
+     */
+    @Override
+    public void configure(ResourceServerSecurityConfigurer resources) {
+        resources.resourceId(RESOURCE_ID)
+        .tokenServices(tokenService())
+        .stateless(true);
+    }
+
+    /**
+     * HttpSecurity配置这个与Spring Security类似：
+     *      -请求匹配器，用来设置需要进行保护的资源路径，默认的情况下是保护资源服务的全部路径。
+     *      -通过http.authorizeRequests()来设置受保护资源的访问规则
+     *      -其他的自定义权限保护规则通过 HttpSecurity 来进行配置。
+     * @param http http
+     * @throws Exception
+     */
+    @Override
+    public void configure(HttpSecurity http) throws Exception {
+        http
+        .authorizeRequests()
+        .antMatchers("/**").access("#oauth2.hasScope('all')")
+        .and().csrf().disable()
+        .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS);
+    }
+
+    /**
+     * 资源服务令牌解析服务
+     * @return ResourceServerTokenServices
+     */
+    @Bean
+    public ResourceServerTokenServices tokenService() {
+        //使用远程服务请求授权服务器校验token,必须指定校验token 的url、client_id，client_secret
+        RemoteTokenServices service=new RemoteTokenServices();
+        service.setCheckTokenEndpointUrl("http://localhost:53020/oauth/check_token");
+        service.setClientId("c1");
+        service.setClientSecret("secret");
+        return service;
+    }
+
+}
+````
+
+***webSecurity***
+
+````java
+package com.maben.order.config;
+
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+
+/**
+ * 资源控制类
+ */
+@Configuration
+@EnableGlobalMethodSecurity(securedEnabled = true,prePostEnabled = true)
+public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
+    //安全拦截机制（最重要）
+    @Override
+    protected void configure(HttpSecurity http) throws Exception {
+        http.csrf().disable()
+        .authorizeRequests()
+        // .antMatchers("/r/r1").hasAuthority("p2")
+        // .antMatchers("/r/r2").hasAuthority("p2")
+        .antMatchers("/r/**").authenticated()//所有/r/**的请求必须认证通过
+        .anyRequest().permitAll()//除了/r/**，其它的请求可以访问
+        ;
+    }
+}
+````
+
+#### 4.3.5 controller类
+
+````java
+package com.maben.order.controller;
+
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * controller 测试类
+ */
+@RestController
+public class OrderController {
+    @GetMapping(value = "/r1")
+    @PreAuthorize("hasAnyAuthority('p1')")
+    public String r1(){
+        return "访问资源1";
+    }
+}
+````
+
+### 4.4 测试(密码认证方式)
+
+> 使用idea的restful工具导入
+
+#### 4.4.1 获取认证token
+
+````xml
+<RestClientRequest>
+  <option name="biscuits">
+    <list />
+  </option>
+  <option name="httpMethod" value="POST" />
+  <option name="urlBase" value="http://localhost:53020" />
+  <option name="urlPath" value="/oauth/token" />
+  <option name="headers">
+    <list>
+      <KeyValuePair>
+        <option name="key" value="Accept" />
+        <option name="value" value="*/*" />
+      </KeyValuePair>
+      <KeyValuePair>
+        <option name="key" value="Cache-Control" />
+        <option name="value" value="no-cache" />
+      </KeyValuePair>
+      <KeyValuePair>
+        <option name="key" value="Content-Type" />
+        <option name="value" value="application/json" />
+      </KeyValuePair>
+    </list>
+  </option>
+  <option name="parameters">
+    <list>
+      <KeyValuePair>
+        <option name="key" value="client_id" />
+        <option name="value" value="c1" />
+      </KeyValuePair>
+      <KeyValuePair>
+        <option name="key" value="client_secret" />
+        <option name="value" value="secret" />
+      </KeyValuePair>
+      <KeyValuePair>
+        <option name="key" value="username" />
+        <option name="value" value="zhangsan" />
+      </KeyValuePair>
+      <KeyValuePair>
+        <option name="key" value="password" />
+        <option name="value" value="123" />
+      </KeyValuePair>
+      <KeyValuePair>
+        <option name="key" value="grant_type" />
+        <option name="value" value="password" />
+      </KeyValuePair>
+    </list>
+  </option>
+  <option name="parametersEnabled" value="true" />
+  <option name="haveTextToSend" value="false" />
+  <option name="haveFileToSend" value="false" />
+  <option name="isFileUpload" value="false" />
+  <option name="textToSend" value="" />
+  <option name="filesToSend" value="" />
+</RestClientRequest>
+````
+
+#### 4.4.2 携带token请求资源
+
+````xml
+<RestClientRequest>
+  <option name="biscuits">
+    <list />
+  </option>
+  <option name="httpMethod" value="GET" />
+  <option name="urlBase" value="http://localhost:53021" />
+  <option name="urlPath" value="r1" />
+  <option name="headers">
+    <list>
+      <KeyValuePair>
+        <option name="key" value="Accept" />
+        <option name="value" value="*/*" />
+      </KeyValuePair>
+      <KeyValuePair>
+        <option name="key" value="Cache-Control" />
+        <option name="value" value="no-cache" />
+      </KeyValuePair>
+      <KeyValuePair>
+        <option name="key" value="Authorization" />
+        <option name="value" value="Bearer 7980c2c0-dacb-45d1-a778-274d94d5da72" />
+      </KeyValuePair>
+    </list>
+  </option>
+  <option name="parameters">
+    <list />
+  </option>
+  <option name="parametersEnabled" value="true" />
+  <option name="haveTextToSend" value="false" />
+  <option name="haveFileToSend" value="false" />
+  <option name="isFileUpload" value="false" />
+  <option name="textToSend" value="" />
+  <option name="filesToSend" value="" />
+</RestClientRequest>
+````
+
+### 4.5 使用JWT验证
+
+#### 4.5.1 authorization 项目修改
+
+**TokenConfig **
+
+````java
+@Configuration
+public class TokenConfig {
+    private String SIGNING_KEY = "uaa123";
+    @Bean
+    public TokenStore tokenStore() {
+        return new JwtTokenStore(accessTokenConverter());
+    }
+    @Bean
+    public JwtAccessTokenConverter accessTokenConverter() {
+        JwtAccessTokenConverter converter = new JwtAccessTokenConverter();
+        converter.setSigningKey(SIGNING_KEY); //对称秘钥，资源服务器使用该秘钥来验证
+        return converter;
+    }
+}
+````
+
+***认证类***
+
+````java
+ 	@Autowired
+    private JwtAccessTokenConverter accessTokenConverter;
+    @Bean
+    public AuthorizationServerTokenServices tokenService() {
+        DefaultTokenServices service=new DefaultTokenServices();
+        service.setClientDetailsService(clientDetailsService);
+        service.setSupportRefreshToken(true);
+        service.setTokenStore(tokenStore);
+        TokenEnhancerChain tokenEnhancerChain = new TokenEnhancerChain();
+        tokenEnhancerChain.setTokenEnhancers(Arrays.asList(accessTokenConverter));
+        service.setTokenEnhancer(tokenEnhancerChain);
+        service.setAccessTokenValiditySeconds(7200); // 令牌默认有效期2小时
+        service.setRefreshTokenValiditySeconds(259200); // 刷新令牌默认有效期3天
+        return service;
+    }
+
+````
+
+#### 4.5.2测试
+
+````xml
+<RestClientRequest>
+  <option name="biscuits">
+    <list />
+  </option>
+  <option name="httpMethod" value="POST" />
+  <option name="urlBase" value="http://localhost:53020" />
+  <option name="urlPath" value="/oauth/token" />
+  <option name="headers">
+    <list>
+      <KeyValuePair>
+        <option name="key" value="Accept" />
+        <option name="value" value="*/*" />
+      </KeyValuePair>
+      <KeyValuePair>
+        <option name="key" value="Cache-Control" />
+        <option name="value" value="no-cache" />
+      </KeyValuePair>
+      <KeyValuePair>
+        <option name="key" value="Content-Type" />
+        <option name="value" value="application/json" />
+      </KeyValuePair>
+    </list>
+  </option>
+  <option name="parameters">
+    <list>
+      <KeyValuePair>
+        <option name="key" value="client_id" />
+        <option name="value" value="c1" />
+      </KeyValuePair>
+      <KeyValuePair>
+        <option name="key" value="client_secret" />
+        <option name="value" value="secret" />
+      </KeyValuePair>
+      <KeyValuePair>
+        <option name="key" value="username" />
+        <option name="value" value="zhangsan" />
+      </KeyValuePair>
+      <KeyValuePair>
+        <option name="key" value="password" />
+        <option name="value" value="123" />
+      </KeyValuePair>
+      <KeyValuePair>
+        <option name="key" value="grant_type" />
+        <option name="value" value="password" />
+      </KeyValuePair>
+    </list>
+  </option>
+  <option name="parametersEnabled" value="true" />
+  <option name="haveTextToSend" value="false" />
+  <option name="haveFileToSend" value="false" />
+  <option name="isFileUpload" value="false" />
+  <option name="textToSend" value="" />
+  <option name="filesToSend" value="" />
+</RestClientRequest>
+````
+
+***生成结果***
+
+````json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOlsicmVzMSJdLCJ1c2VyX25hbWUiOiJ6aGFuZ3NhbiIsInNjb3BlIjpbImFsbCJdLCJleHAiOjE2MTY1NzU5ODAsImF1dGhvcml0aWVzIjpbInAxIiwicDMiXSwianRpIjoiZjA0NzlkNGItZjEwZC00OWRjLTg4ZDUtOWZjYzEzZTY1NGNhIiwiY2xpZW50X2lkIjoiYzEifQ.hjMs6RUXGaZAmAERzSwcTv3x197MyyJIDaMnHjsBv6A",
+  "token_type": "bearer",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOlsicmVzMSJdLCJ1c2VyX25hbWUiOiJ6aGFuZ3NhbiIsInNjb3BlIjpbImFsbCJdLCJhdGkiOiJmMDQ3OWQ0Yi1mMTBkLTQ5ZGMtODhkNS05ZmNjMTNlNjU0Y2EiLCJleHAiOjE2MTY4Mjc5ODAsImF1dGhvcml0aWVzIjpbInAxIiwicDMiXSwianRpIjoiYmVmNjZjNmYtN2M5YS00N2RiLWI2NmItMmMzNTliODg4ZGZiIiwiY2xpZW50X2lkIjoiYzEifQ.Ks4oWVwZJ-v9gDZ6uCK4Robkhft6ZBJ0C8qE2CcZFtw",
+  "expires_in": 7199,
+  "scope": "all",
+  "jti": "f0479d4b-f10d-49dc-88d5-9fcc13e654ca"
+}
+````
+
+### 4.6 加入DB
+
+#### 4.6.1 SQL语句
+
+> oauth_client_details存储客户端信息
+
+````sql
+-- 创建表语句
+DROP TABLE IF EXISTS `oauth_client_details`;
+
+CREATE TABLE `oauth_client_details` (
+	`client_id` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL COMMENT '客户端标 识',
+	`resource_ids` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL COMMENT '接入资源列表',
+	`client_secret` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL COMMENT '客户端秘钥',
+	`scope` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
+	`authorized_grant_types` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
+	`web_server_redirect_uri` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
+	`authorities` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
+	`access_token_validity` int(11) NULL DEFAULT NULL,
+	`refresh_token_validity` int(11) NULL DEFAULT NULL,
+	`additional_information` longtext CHARACTER SET utf8 COLLATE utf8_general_ci NULL,
+	`create_time` timestamp(0) NOT NULL DEFAULT CURRENT_TIMESTAMP(0) ON UPDATE CURRENT_TIMESTAMP(0),
+	`archived` tinyint(4) NULL DEFAULT NULL,
+	`trusted` tinyint(4) NULL DEFAULT NULL,
+	`autoapprove` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
+	PRIMARY KEY USING BTREE (`client_id`)
+) ENGINE = InnoDB CHARACTER SET = utf8 COLLATE = utf8_general_ci ROW_FORMAT = Dynamic COMMENT '接入客户端信息';
+
+-- 插入语句
+INSERT INTO `oauth_client_details`
+VALUES ('c1', 'res1', '$2a$10$0J7SLKTpF/y1Lh.zbC5Goez1i56D53wnyB.VA7YVA7nPo3RbmMyx6', 'ROLE_ADMIN,ROLE_USER,ROLE_API', 'client_credentials,password,authorization_code,implicit,refresh_token'
+	, 'http://www.baidu.com', NULL, 7200, 259200, NULL
+	, str_to_date('2019-09-09 16:04:28','%Y-%m-%d %H:%i:%s'), 0, 0, 'false');
+
+INSERT INTO `oauth_client_details`
+VALUES ('c2', 'res2', '$2a$10$0J7SLKTpF/y1Lh.zbC5Goez1i56D53wnyB.VA7YVA7nPo3RbmMyx6', 'ROLE_API', 'client_credentials,password,authorization_code,implicit,refresh_token'
+	, 'http://www.baidu.com', NULL, 31536000, 2592000, NULL
+	, str_to_date('2019-09-09 21:48:51','%Y-%m-%d %H:%i:%s'), 0, 0, 'false');
+````
+
+> oauth_code表，Spring Security OAuth2使用，用来存储授权码：
+
+````sql
+DROP TABLE IF EXISTS `oauth_code`;
+
+CREATE TABLE `oauth_code` (
+	`create_time` timestamp(0) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	`code` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
+	`authentication` blob NULL,
+	INDEX `code_index` USING BTREE(`code`)
+) ENGINE = InnoDB CHARACTER SET = utf8 COLLATE = utf8_general_ci ROW_FORMAT = Compact;
+````
+
+#### 4.6.2 authorization项目修改
+
+> 将之前的认证类注解去掉,使之失效;配置下面的新配置类
+
+````java
+package com.maben.authorization.config;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.config.annotation.configurers.ClientDetailsServiceConfigurer;
+import org.springframework.security.oauth2.config.annotation.web.configuration.AuthorizationServerConfigurerAdapter;
+import org.springframework.security.oauth2.config.annotation.web.configuration.EnableAuthorizationServer;
+import org.springframework.security.oauth2.config.annotation.web.configurers.AuthorizationServerEndpointsConfigurer;
+import org.springframework.security.oauth2.config.annotation.web.configurers.AuthorizationServerSecurityConfigurer;
+import org.springframework.security.oauth2.provider.ClientDetailsService;
+import org.springframework.security.oauth2.provider.client.JdbcClientDetailsService;
+import org.springframework.security.oauth2.provider.code.AuthorizationCodeServices;
+import org.springframework.security.oauth2.provider.code.InMemoryAuthorizationCodeServices;
+import org.springframework.security.oauth2.provider.code.JdbcAuthorizationCodeServices;
+import org.springframework.security.oauth2.provider.token.AuthorizationServerTokenServices;
+import org.springframework.security.oauth2.provider.token.DefaultTokenServices;
+import org.springframework.security.oauth2.provider.token.TokenEnhancerChain;
+import org.springframework.security.oauth2.provider.token.TokenStore;
+import org.springframework.security.oauth2.provider.token.store.JwtAccessTokenConverter;
+
+import javax.sql.DataSource;
+import java.util.Arrays;
+
+/**
+ * 认证配置类
+ */
+@Configuration
+@EnableAuthorizationServer
+public class AuthorizationServerDB extends AuthorizationServerConfigurerAdapter {
+
+    @Autowired
+    private TokenStore tokenStore;
+    @Autowired
+    private JwtAccessTokenConverter accessTokenConverter;
+    @Autowired
+    private ClientDetailsService clientDetailsService;
+    @Autowired
+    private AuthorizationCodeServices authorizationCodeServices;
+    @Autowired
+    private AuthenticationManager authenticationManager;
+
+    /**
+     * 1.客户端详情相关配置
+     */
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+    @Bean
+    public ClientDetailsService clientDetailsService(DataSource dataSource) {
+        ClientDetailsService clientDetailsService = new JdbcClientDetailsService(dataSource);
+        ((JdbcClientDetailsService)
+                clientDetailsService).setPasswordEncoder(passwordEncoder());
+        return clientDetailsService;
+    }
+    @Override
+    public void configure(ClientDetailsServiceConfigurer clients)
+            throws Exception {
+        clients.withClientDetails(clientDetailsService);
+    }
+    /**
+     * 2.配置令牌服务(token services)
+     */
+    @Bean
+    public AuthorizationServerTokenServices tokenService() {
+        DefaultTokenServices service=new DefaultTokenServices();
+        service.setClientDetailsService(clientDetailsService);
+        service.setSupportRefreshToken(true);//支持刷新令牌
+        service.setTokenStore(tokenStore); //绑定tokenStore
+        TokenEnhancerChain tokenEnhancerChain = new TokenEnhancerChain();
+        tokenEnhancerChain.setTokenEnhancers(Arrays.asList(accessTokenConverter));
+        service.setTokenEnhancer(tokenEnhancerChain);
+        service.setAccessTokenValiditySeconds(7200); // 令牌默认有效期2小时
+        service.setRefreshTokenValiditySeconds(259200); // 刷新令牌默认有效期3天
+        return service;
+    }
+
+    /**
+     * 3.配置令牌（token）的访问端点
+     */
+    @Bean
+    public AuthorizationCodeServices authorizationCodeServices(DataSource dataSource) {
+        return new JdbcAuthorizationCodeServices(dataSource);//设置授权码模式的授权码如何存取
+    }
+    @Override
+    public void configure(AuthorizationServerEndpointsConfigurer endpoints) {
+        endpoints.authenticationManager(authenticationManager)
+                .authorizationCodeServices(authorizationCodeServices)
+                .tokenServices(tokenService())
+                .allowedTokenEndpointRequestMethods(HttpMethod.POST);
+    }
+
+    /**
+     * 4.配置令牌端点(Token Endpoint)的安全约束
+     */
+    @Override
+    public void configure(AuthorizationServerSecurityConfigurer security){
+        security
+                .tokenKeyAccess("permitAll()")
+                .checkTokenAccess("permitAll()")
+                .allowFormAuthenticationForClients()//允许表单认证
+        ;
+    }
+
+}
+
+````
+
+
+
+#### 4.6.3 测试结果
+
+> 使用idea的restful测试结果如下(测试密码格式的)
+
+````json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOlsicmVzMSJdLCJ1c2VyX25hbWUiOiJ6aGFuZ3NhbiIsInNjb3BlIjpbIlJPTEVfQURNSU4iLCJST0xFX1VTRVIiLCJST0xFX0FQSSJdLCJleHAiOjE2MTY1ODAxNTYsImF1dGhvcml0aWVzIjpbInAxIiwicDMiXSwianRpIjoiZjgzMmQwODMtNWExOC00ZWI1LWJmYTMtZDE0OTM1OGIzZDk2IiwiY2xpZW50X2lkIjoiYzEifQ.l39-ui7U3SDjASfi1DsGSRHEjck-zaaZBmwnFtLS4Gw",
+  "token_type": "bearer",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOlsicmVzMSJdLCJ1c2VyX25hbWUiOiJ6aGFuZ3NhbiIsInNjb3BlIjpbIlJPTEVfQURNSU4iLCJST0xFX1VTRVIiLCJST0xFX0FQSSJdLCJhdGkiOiJmODMyZDA4My01YTE4LTRlYjUtYmZhMy1kMTQ5MzU4YjNkOTYiLCJleHAiOjE2MTY4MzIxNTYsImF1dGhvcml0aWVzIjpbInAxIiwicDMiXSwianRpIjoiNDhiYmQ3MzAtYTFjNS00YjljLWFlY2QtMzczODZlNDdlMGNhIiwiY2xpZW50X2lkIjoiYzEifQ.2GAIMNW6ON5vsDF4ilZo1pNZHfbjMzAbhC_FwJRoxI8",
+  "expires_in": 7199,
+  "scope": "ROLE_ADMIN ROLE_USER ROLE_API",
+  "jti": "f832d083-5a18-4eb5-bfa3-d149358b3d96"
+}
+````
+
+
 
